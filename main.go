@@ -7,8 +7,10 @@ import (
 
 func main() {
 	const port = "8080"
+	const rootDir = "."
 
 	serverMux := http.NewServeMux()
+	serverMux.Handle("/", http.FileServer(http.Dir(rootDir)))
 
 	server := &http.Server{
 		Addr:    ":" + port,
