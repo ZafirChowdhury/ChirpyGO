@@ -11,7 +11,7 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type ReturnValue struct {
-		Valid bool `json:"valid"`
+		Body string `json:"cleaned_body"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -28,7 +28,7 @@ func handlerValidateChirp(w http.ResponseWriter, r *http.Request) {
 	}
 
 	resJson := ReturnValue{
-		Valid: true,
+		Body: profanityFilter(vc.Body),
 	}
 
 	respondWithJSON(w, http.StatusOK, resJson)
