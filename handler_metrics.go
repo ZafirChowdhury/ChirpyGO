@@ -33,9 +33,23 @@ func (cfg *apiConfig) handlerMetrics(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(body))
 }
 
-func (cfg *apiConfig) handlerMetricsReset(w http.ResponseWriter, r *http.Request) {
+func (cfg *apiConfig) handlerAdminReset(w http.ResponseWriter, r *http.Request) {
+	// check if server running in local dev
+	if cfg.platform != "dev" {
+		respondWithError(w, http.StatusForbidden, "Admin reset can only run only on local devlopment")
+		return
+	}
+
+	// reset file server hit count
 	cfg.fileserverHits.Store(0)
 
+	// reset database
+	if err := cfg.db.ResetUsers(r.Context()); err != nil {
+		respondWithError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	// response
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(http.StatusText(http.StatusOK)))
