@@ -9,6 +9,17 @@ import (
 	"github.com/google/uuid"
 )
 
+func dbResToChirp(dbRes database.Chirp) Chirp {
+	return Chirp{
+		ID:        dbRes.ID,
+		CreatedAt: dbRes.CreatedAt,
+		UpdatedAt: dbRes.UpdatedAt,
+		Body:      dbRes.Body,
+		UserID:    dbRes.UserID,
+	}
+
+}
+
 func (cfg *apiConfig) handlerCreateNewChirp(w http.ResponseWriter, r *http.Request) {
 	type Response struct {
 		UserID uuid.UUID `json:"user_id"`
@@ -39,14 +50,7 @@ func (cfg *apiConfig) handlerCreateNewChirp(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	c := Chirp{
-		ID:        dbRes.ID,
-		CreatedAt: dbRes.CreatedAt,
-		UpdatedAt: dbRes.UpdatedAt,
-		Body:      dbRes.Body,
-		UserID:    dbRes.UserID,
-	}
-
+	c := dbResToChirp(dbRes)
 	respondWithJSON(w, http.StatusCreated, c)
 }
 
@@ -60,14 +64,27 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 
 	chirps := []Chirp{}
 	for _, c := range dbRes {
-		chirps = append(chirps, Chirp{
-			ID:        c.ID,
-			Body:      c.Body,
-			CreatedAt: c.CreatedAt,
-			UpdatedAt: c.UpdatedAt,
-			UserID:    c.UserID,
-		})
+		chirps = append(chirps, dbResToChirp(c))
 	}
 
 	respondWithJSON(w, http.StatusOK, chirps)
+}
+
+func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusNotFound, "Not found")
+		return
+	}
+
+	dbRes, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusNotFound, "Not found")
+		return
+	}
+
+	c := dbResToChirp(dbRes)
+	respondWithJSON(w, http.StatusOK, c)
 }
