@@ -4,7 +4,8 @@ VALUES (
     gen_random_uuid(), 
     NOW() AT TIME ZONE 'UTC', 
     NOW() AT TIME ZONE 'UTC', 
-    $1)
+    $1
+)
 RETURNING *;
 
 -- name: ResetUsers :exec

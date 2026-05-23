@@ -47,14 +47,18 @@ func main() {
 	serverMux.Handle("/app/", cfg.middlewareMetricsInc(
 		http.StripPrefix("/app", http.FileServer(http.Dir(rootDir)))))
 
+	// server health
 	serverMux.HandleFunc("GET /healthz", handlerReadiness)
 
+	// admin
 	serverMux.HandleFunc("GET /admin/metrics", cfg.handlerMetrics)
 	serverMux.HandleFunc("POST /admin/reset", cfg.handlerAdminReset)
 
-	serverMux.HandleFunc("POST /api/validate_chirp", handlerValidateChirp)
-
+	// users
 	serverMux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
+
+	// chirps
+	serverMux.HandleFunc("POST /api/chirps", cfg.handlerCreateNewChirp)
 
 	server := &http.Server{
 		Addr:    ":" + port,
