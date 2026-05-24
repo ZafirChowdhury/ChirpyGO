@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/ZafirChowdhury/ChirpyGO/internal/auth"
 	"github.com/ZafirChowdhury/ChirpyGO/internal/database"
@@ -11,8 +12,9 @@ import (
 
 func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	type Request struct {
-		Password string `json:"password"`
-		Email    string `json:"email"`
+		Password     string `json:"password"`
+		Email        string `json:"email"`
+		ExpiresInSec int    `json:"expires_in_seconds"`
 	}
 
 	req := Request{}
@@ -25,6 +27,11 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 	if req.Email == "" || req.Password == "" {
 		respondWithError(w, http.StatusBadRequest, "Email and password is required")
 		return
+	}
+
+	expiresIn := time.Duration(req.ExpiresInSec) * time.Second
+	if expiresIn <= 0 || expiresIn > time.Hour {
+		expiresIn = time.Hour
 	}
 
 	dbRes, err := cfg.db.GetUserByEmail(r.Context(), req.Email)
@@ -46,11 +53,19 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	token, err := auth.MakeJWT(dbRes.ID, cfg.secretKey, expiresIn)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
 	user := User{
 		ID:        dbRes.ID,
 		CreatedAt: dbRes.CreatedAt,
 		UpdatedAt: dbRes.UpdatedAt,
 		Email:     dbRes.Email,
+		Token:     token,
 	}
 
 	respondWithJSON(w, http.StatusOK, user)

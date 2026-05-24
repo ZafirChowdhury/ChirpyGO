@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/ZafirChowdhury/ChirpyGO/internal/auth"
 	"github.com/ZafirChowdhury/ChirpyGO/internal/database"
 	"github.com/google/uuid"
 )
@@ -21,28 +22,42 @@ func dbResToChirp(dbRes database.Chirp) Chirp {
 }
 
 func (cfg *apiConfig) handlerCreateNewChirp(w http.ResponseWriter, r *http.Request) {
-	type Response struct {
-		UserID uuid.UUID `json:"user_id"`
-		Body   string    `json:"body"`
+	type RequestBody struct {
+		Body string `json:"body"`
+	}
+
+	// check JWT
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	userID, err := auth.ValidateJWT(token, cfg.secretKey)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, "Invalid JWT")
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
-	res := Response{}
-	err := decoder.Decode(&res)
+	req := RequestBody{}
+	err = decoder.Decode(&req)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
 	// check length
-	if len(res.Body) > 140 {
+	if len(req.Body) > 140 {
 		respondWithError(w, http.StatusBadRequest, "Chirp is too long")
 		return
 	}
 
 	dbRes, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
-		UserID: res.UserID,
-		Body:   profanityFilter(res.Body),
+		UserID: userID,
+		Body:   profanityFilter(req.Body),
 	})
 	if err != nil {
 		log.Println(err.Error())
