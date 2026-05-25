@@ -79,6 +79,7 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		Email:        dbRes.Email,
 		Token:        token,
 		RefreshToken: rt.Token,
+		IsRed:        dbRes.IsChirpyRed,
 	}
 
 	respondWithJSON(w, http.StatusOK, user)
@@ -124,6 +125,7 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 		CreatedAt: usr.CreatedAt,
 		UpdatedAt: usr.UpdatedAt,
 		Email:     usr.Email,
+		IsRed:     usr.IsChirpyRed,
 	}
 
 	respondWithJSON(w, http.StatusCreated, user)
@@ -246,6 +248,7 @@ func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) 
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 		Email:     u.Email,
+		IsRed:     u.IsChirpyRed,
 	}
 
 	respondWithJSON(w, http.StatusOK, user)
