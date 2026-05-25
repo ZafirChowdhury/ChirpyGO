@@ -103,3 +103,46 @@ func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
 	c := dbResToChirp(dbRes)
 	respondWithJSON(w, http.StatusOK, c)
 }
+
+func (cfg *apiConfig) handlerDeleteChirp(w http.ResponseWriter, r *http.Request) {
+	jwtToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	uID, err := auth.ValidateJWT(jwtToken, cfg.secretKey)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	chirpID, err := uuid.Parse(r.PathValue("chirpID"))
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusNotFound, "Not found")
+		return
+	}
+
+	c, err := cfg.db.GetChirp(r.Context(), chirpID)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusNotFound, "Not found")
+		return
+	}
+
+	if uID != c.UserID {
+		respondWithError(w, http.StatusForbidden, "Forbidden")
+		return
+	}
+
+	err = cfg.db.DeleteChirp(r.Context(), c.ID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
