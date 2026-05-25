@@ -60,12 +60,25 @@ func (cfg *apiConfig) handlerLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken := auth.MakeRefreshToken()
+	rt, err := cfg.db.SaveRefreshToken(r.Context(), database.SaveRefreshTokenParams{
+		Token:     refreshToken,
+		UserID:    dbRes.ID,
+		ExpiresAt: time.Now().UTC().Add(time.Hour * 24 * 60),
+	})
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
 	user := User{
-		ID:        dbRes.ID,
-		CreatedAt: dbRes.CreatedAt,
-		UpdatedAt: dbRes.UpdatedAt,
-		Email:     dbRes.Email,
-		Token:     token,
+		ID:           dbRes.ID,
+		CreatedAt:    dbRes.CreatedAt,
+		UpdatedAt:    dbRes.UpdatedAt,
+		Email:        dbRes.Email,
+		Token:        token,
+		RefreshToken: rt.Token,
 	}
 
 	respondWithJSON(w, http.StatusOK, user)
@@ -114,4 +127,62 @@ func (cfg *apiConfig) handlerCreateUser(w http.ResponseWriter, r *http.Request) 
 	}
 
 	respondWithJSON(w, http.StatusCreated, user)
+}
+
+func (cfg *apiConfig) handlerRefresh(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	rt, err := cfg.db.GetRefreshToken(r.Context(), token)
+	if err != nil {
+		// dosent exist
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	if rt.RevokedAt.Valid || rt.ExpiresAt.Before(time.Now().UTC()) {
+		// revoked or expired
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	type Return struct {
+		Token string `json:"token"`
+	}
+
+	jwt, err := auth.MakeJWT(rt.UserID, cfg.secretKey, time.Hour)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	returnBody := Return{
+		Token: jwt,
+	}
+
+	respondWithJSON(w, http.StatusOK, returnBody)
+}
+
+func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+	err = cfg.db.RevokeToken(r.Context(), token)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }
