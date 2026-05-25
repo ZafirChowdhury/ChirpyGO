@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"sort"
 
 	"github.com/ZafirChowdhury/ChirpyGO/internal/auth"
 	"github.com/ZafirChowdhury/ChirpyGO/internal/database"
@@ -70,7 +71,18 @@ func (cfg *apiConfig) handlerCreateNewChirp(w http.ResponseWriter, r *http.Reque
 }
 
 func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
-	dbRes, err := cfg.db.GetChirps(r.Context())
+	s := r.URL.Query().Get("author_id")
+	sortParam := r.URL.Query().Get("sort")
+
+	var err error
+	var dbRes []database.Chirp
+	if s == "" {
+		dbRes, err = cfg.db.GetChirps(r.Context())
+	} else {
+		authorID, _ := uuid.Parse(s)
+		dbRes, err = cfg.db.GetChirpsByID(r.Context(), authorID)
+	}
+
 	if err != nil {
 		log.Println(err.Error())
 		respondWithError(w, http.StatusInternalServerError, "There was a error while trying to get chrips")
@@ -81,6 +93,15 @@ func (cfg *apiConfig) handlerGetChirps(w http.ResponseWriter, r *http.Request) {
 	for _, c := range dbRes {
 		chirps = append(chirps, dbResToChirp(c))
 	}
+
+	sort.Slice(chirps, func(i, j int) bool {
+		if sortParam == "desc" {
+			// desc: later time comes first → i is "less" if it's AFTER j
+			return chirps[i].CreatedAt.After(chirps[j].CreatedAt)
+		}
+		// asc (default): earlier time comes first → i is "less" if it's BEFORE j
+		return chirps[i].CreatedAt.Before(chirps[j].CreatedAt)
+	})
 
 	respondWithJSON(w, http.StatusOK, chirps)
 }
