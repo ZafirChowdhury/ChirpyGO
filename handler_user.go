@@ -186,3 +186,67 @@ func (cfg *apiConfig) handlerRevoke(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (cfg *apiConfig) handlerUpdateUser(w http.ResponseWriter, r *http.Request) {
+	type JBody struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	jwtToken, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, err.Error())
+		return
+	}
+
+	uID, err := auth.ValidateJWT(jwtToken, cfg.secretKey)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	jBody := JBody{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&jBody); err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusUnauthorized, "Invalid JSON body")
+		return
+	}
+
+	_, err = cfg.db.GetUserByID(r.Context(), uID)
+	if err != nil {
+		log.Println("User not found in database")
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	newPasswordHash, err := auth.HashPassword(jBody.Password)
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	u, err := cfg.db.UpdateUser(r.Context(), database.UpdateUserParams{
+		Email:          jBody.Email,
+		HashedPassword: newPasswordHash,
+		ID:             uID,
+	})
+	if err != nil {
+		log.Println(err.Error())
+		respondWithError(w, http.StatusInternalServerError, "Internal server error")
+		return
+	}
+
+	user := User{
+		ID:        u.ID,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
+		Email:     u.Email,
+	}
+
+	respondWithJSON(w, http.StatusOK, user)
+}

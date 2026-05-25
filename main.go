@@ -57,8 +57,11 @@ func main() {
 	serverMux.HandleFunc("POST /admin/reset", cfg.handlerAdminReset)
 
 	// users
-	serverMux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
 	serverMux.HandleFunc("POST /api/login", cfg.handlerLogin)
+	serverMux.HandleFunc("POST /api/users", cfg.handlerCreateUser)
+	serverMux.HandleFunc("PUT /api/users", cfg.handlerUpdateUser)
+
+	// auth
 	serverMux.HandleFunc("POST /api/refresh", cfg.handlerRefresh)
 	serverMux.HandleFunc("POST /api/revoke", cfg.handlerRevoke)
 
